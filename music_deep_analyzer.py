@@ -803,10 +803,55 @@ def analyze_lyrics(audio_path):
         progress(f"Lỗi khi bóc băng Whisper: {e}")
         return "(Lỗi khi bóc băng)"
 
+# ─── MODULE 1G: INSTRUMENTS & AUDIO TAGS (PANNs) ──────────────────────────────
+
+def analyze_instruments(audio_path):
+    """Sử dụng PANNs (AudioSet) để nhận diện nhạc cụ, giọng hát và không gian."""
+    progress("Phân tích nhạc cụ & âm thanh bằng PANNs (Audio Tagging)...")
+    try:
+        from panns_inference import AudioTagging, labels
+        import librosa
+        import numpy as np
+        import warnings
+
+        # PANNs yêu cầu sample rate 32kHz
+        audio, _ = librosa.load(audio_path, sr=32000, mono=True)
+        audio = audio[None, :]  # (batch_size, samples)
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            # Tự động tải model Cnn14 (chạy trên CPU)
+            at = AudioTagging(checkpoint_path=None, device='cpu')
+            clipwise_output, _ = at.inference(audio)
+
+        sorted_indexes = np.argsort(clipwise_output[0])[::-1]
+        
+        tags = []
+        # Các nhãn quá chung chung, không hữu ích cho Suno prompt
+        ignore_tags = {
+            "Music", "Musical instrument", "Sound", "Song", "Noise",
+            "Inside, small room", "Inside, large room or hall", "Speech",
+            "Music of Africa", "Music of Asia", "Music of Latin America"
+        }
+
+        for i in range(20):
+            idx = sorted_indexes[i]
+            label = np.array(labels)[idx]
+            prob = float(clipwise_output[0][idx])
+            if label not in ignore_tags and prob >= 0.01:
+                tags.append(label)
+
+        return tags[:6]  # Trả về tối đa 6 nhãn phù hợp nhất
+    except ImportError:
+        return ["(panns-inference chưa được cài đặt)"]
+    except Exception as e:
+        progress(f"Lỗi khi chạy PANNs: {e}")
+        return []
+
 # ─── MODULE 2: GENERATE ANALYSIS REPORT ──────────────────────────────────────
 
 def build_report(file_path, meta, audio_props, rhythm, key_info, chords,
-                 structure, dynamics, timbre, extra):
+                 structure, dynamics, timbre, extra, audio_tags):
     """Tạo báo cáo Markdown chi tiết"""
     progress("Đang tạo báo cáo phân tích Markdown...")
 
@@ -835,6 +880,7 @@ def build_report(file_path, meta, audio_props, rhythm, key_info, chords,
     A(f"| 🎭 Valence/Mood | **{extra['valence_score']}** — {extra['valence_label']} |")
     A(f"| 🎸 Phong cách | {timbre['hp_description']} |")
     A(f"| 🌈 Âm sắc | {timbre['brightness']} |")
+    A(f"| 🎧 Âm thanh (PANNs)| **{', '.join(audio_tags)}** |")
     A("")
 
     # ── METADATA ──
@@ -1046,10 +1092,14 @@ def build_report(file_path, meta, audio_props, rhythm, key_info, chords,
 
     # ── EXTRA ──
     A("---")
-    A("## 🔬 9. Đặc trưng Cảm xúc & Chuyển động")
+    A("## 🔬 9. Đặc trưng Cảm xúc & Nhạc cụ")
     A("")
+    A("### Cảm xúc & Chuyển động:")
     A(f"- **Danceability:** {extra['danceability_score']} / 1.0 — {extra['danceability_label']}")
     A(f"- **Valence (tâm trạng):** {extra['valence_score']} / 1.0 — {extra['valence_label']}")
+    A("")
+    A("### Nhận diện Âm thanh / Nhạc cụ (Audio Tags):")
+    A(f"> {', '.join(audio_tags)}")
     A("")
 
     # ── FOOTER ──
@@ -1068,7 +1118,7 @@ def build_report(file_path, meta, audio_props, rhythm, key_info, chords,
 
 # ─── MODULE 3: GENERATE SUNO PROMPT ──────────────────────────────────────────
 
-def build_suno_prompt(meta, rhythm, key_info, chords, structure, dynamics, timbre, extra):
+def build_suno_prompt(meta, rhythm, key_info, chords, structure, dynamics, timbre, extra, audio_tags):
     """Tao Suno AI Prompt: archetype-driven narrative voi vocabulary giau co"""
     progress("Dang tao Suno AI Prompt...")
 
@@ -1554,6 +1604,7 @@ def build_suno_prompt(meta, rhythm, key_info, chords, structure, dynamics, timbr
     A("Danceability:  {} — {}".format(extra["danceability_score"], extra["danceability_label"]))
     A("Mood/Valence:  {} — {}".format(extra["valence_score"], extra["valence_label"]))
     A("Am sac:        {}".format(timbre["brightness"]))
+    A("Audio Tags:    {}".format(", ".join(audio_tags)))
     A("")
     A(SEP)
     A("HUONG DAN TINH CHINH STYLE PROMPT")
@@ -1661,15 +1712,18 @@ def main():
     # ── 9. Extra ──
     extra = analyze_extra(y, sr, duration)
 
+    # ── 10. Instruments / Tags ──
+    audio_tags = analyze_instruments(file_path)
+
     elapsed = round(time.time() - start_time, 1)
     progress(f"Hoàn thành phân tích sau {elapsed}s")
     print()
 
     # ── Build outputs ──
     report_md    = build_report(file_path, meta, audio_props, rhythm, key_info,
-                                chords, structure, dynamics, timbre, extra)
+                                chords, structure, dynamics, timbre, extra, audio_tags)
     suno_prompt  = build_suno_prompt(meta, rhythm, key_info, chords, structure,
-                                     dynamics, timbre, extra)
+                                     dynamics, timbre, extra, audio_tags)
 
     # ── Save outputs ──
     base_name = os.path.splitext(file_path)[0]

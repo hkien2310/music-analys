@@ -97,6 +97,7 @@ def generate_with_gemini(api_key: str, analysis: dict, song_context: str = "") -
     tim = analysis.get("timbre", {})
     ex  = analysis.get("extra", {})
     meta = analysis.get("metadata", {})
+    audio_tags = analysis.get("audio_tags", [])
 
     bpm      = r.get("bpm", 120)
     ts       = r.get("ts_label", "4/4")
@@ -129,6 +130,7 @@ CRITICAL FORMAT RULES:
 1. STYLES section = ONE flowing paragraph (no line breaks). 
    Must include: genre + influences, specific instruments with playing technique and sonic character,
    vocal description (include gender, quality, style), arrangement arc.
+   CRITICAL: You MUST use the exact instruments and vocal styles listed in "Detected Instruments/Audio Tags". Do not invent other instruments unless necessary for the genre.
    Be evocative, specific, cinematic. Write like a real producer describing the track.
    
 2. LYRICS section = Full song structure with Suno bracket headers.
@@ -162,6 +164,7 @@ Valence (mood): {valence:.2f} — {valence_lbl}
 Danceability: {dance:.2f} — {dance_lbl}
 Loudness: {lufs:.1f} LUFS
 Scale type: {scale} ({"bright, hopeful, energetic" if scale == "Major" else "emotional, introspective, tense"})
+Detected Instruments/Audio Tags: {", ".join(audio_tags)}
 {context_note}
 
 RAW TRANSCRIBED LYRICS:
@@ -250,7 +253,7 @@ def run_analysis(audio_path: str, original_name: str = "") -> dict:
     from music_deep_analyzer import (
         get_metadata, load_audio, analyze_rhythm, analyze_key,
         analyze_chords, analyze_structure, analyze_dynamics,
-        analyze_timbre, analyze_extra, analyze_lyrics, build_report, build_suno_prompt
+        analyze_timbre, analyze_extra, analyze_lyrics, analyze_instruments, build_report, build_suno_prompt
     )
 
     name = Path(original_name).stem if original_name else Path(audio_path).stem
@@ -267,6 +270,7 @@ def run_analysis(audio_path: str, original_name: str = "") -> dict:
     timbre_raw = analyze_timbre(y, sr)
     extra_raw  = analyze_extra(y, sr, duration)
     lyrics_raw = analyze_lyrics(audio_path)
+    audio_tags = analyze_instruments(audio_path)
 
     elapsed = round(time.time() - t0, 1)
 
@@ -282,9 +286,9 @@ def run_analysis(audio_path: str, original_name: str = "") -> dict:
     }
     report_md = build_report(audio_path, meta, audio_props,
                              rhythm_raw, key_raw, chords_raw,
-                             struct_raw, dyn_raw, timbre_raw, extra_raw)
+                             struct_raw, dyn_raw, timbre_raw, extra_raw, audio_tags)
     suno_txt  = build_suno_prompt(meta, rhythm_raw, key_raw, chords_raw,
-                                  struct_raw, dyn_raw, timbre_raw, extra_raw)
+                                  struct_raw, dyn_raw, timbre_raw, extra_raw, audio_tags)
 
     bpm  = rhythm_raw.get("tempo_bpm", 0)
     feel = _bpm_feel(bpm)
@@ -388,6 +392,7 @@ def run_analysis(audio_path: str, original_name: str = "") -> dict:
             "valence":      extra_raw.get("valence_score",0),
             "valence_label": extra_raw.get("valence_label",""),
         },
+        "audio_tags": audio_tags,
         "lyrics_raw": lyrics_raw,
         "report_md": report_md,
         "suno_txt":  suno_txt,

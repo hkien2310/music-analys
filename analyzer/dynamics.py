@@ -31,7 +31,10 @@ def analyze_dynamics(y, sr, duration):
     result["rms_max"]   = round(float(np.max(rms)), 4)
     result["rms_min"]   = round(float(np.min(rms)), 4)
     result["rms_std"]   = round(float(np.std(rms)), 4)
-    result["dynamic_range_db"] = round(float(20 * np.log10(result["rms_max"] / (result["rms_min"] + 1e-9))), 1)
+    # Clamp rms_min to avoid absurd dB values (silence → near-0 → 160+ dB)
+    rms_min_safe = max(float(np.min(rms)), 0.001)
+    dr = float(20 * np.log10(result["rms_max"] / rms_min_safe))
+    result["dynamic_range_db"] = round(min(dr, 80.0), 1)  # Cap at 80 dB
 
     # Loudness chuẩn LUFS
     if DEPS["pyloudnorm"]:

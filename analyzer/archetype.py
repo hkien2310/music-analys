@@ -319,7 +319,7 @@ def detect_archetype(audio_tags, tag_probs, rhythm, key_info, timbre, extra, met
     # ══════════════════════════════════════════════════════════════════════════
     
     if not scores:
-        scores["contemporary-pop"] = 1.0
+        scores["contemporary-pop"] = 0.1  # Low score = low confidence for default
     
     sorted_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)
     winner = sorted_scores[0]
@@ -328,7 +328,14 @@ def detect_archetype(audio_tags, tag_probs, rhythm, key_info, timbre, extra, met
     
     # Confidence: ratio of top score to sum of all scores
     total_score = sum(s for _, s in sorted_scores)
-    confidence = round(max_score / total_score, 2) if total_score > 0 else 0.5
+    if total_score > 0:
+        ratio = max_score / total_score
+        # Boost: if clear winner (big gap to #2), increase confidence
+        runner_up = sorted_scores[1][1] if len(sorted_scores) > 1 else 0
+        margin = (max_score - runner_up) / max_score if max_score > 0 else 0
+        confidence = round(min(1.0, ratio * 0.7 + margin * 0.3), 2)
+    else:
+        confidence = 0.0
     
     # Get display names
     names = ARCHETYPE_NAMES.get(archetype, (archetype, archetype))

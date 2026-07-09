@@ -217,14 +217,14 @@ def build_report(file_path, meta, audio_props, rhythm, key_info, chords,
     A("")
 
     # ── SECTION 0: NHẬN XÉT TỔNG QUAN ──
-    bpm = rhythm["tempo_bpm"]
-    scale = key_info["scale"]
-    root = key_info["root"]
-    valence = extra["valence_score"]
-    dance = extra["danceability_score"]
-    sc_hz = timbre["spectral_centroid_hz"]
-    harm_ratio = timbre["harmonic_ratio"]
-    perc_ratio = timbre["percussive_ratio"]
+    bpm = rhythm.get("tempo_bpm", 120)
+    scale = key_info.get("scale", "Major")
+    root = key_info.get("root", "C")
+    valence = extra.get("valence_score", 0.5)
+    dance = extra.get("danceability_score", 0.5)
+    sc_hz = timbre.get("spectral_centroid_hz", 2000)
+    harm_ratio = timbre.get("harmonic_ratio", 0.7)
+    perc_ratio = timbre.get("percussive_ratio", 0.3)
     genre_raw = (meta.get("genre") or "").lower().strip()
 
     if archetype_result:

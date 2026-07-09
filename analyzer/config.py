@@ -5,15 +5,10 @@ Bao gồm:
 - Import & dependency detection (numpy, librosa, tinytag, pyloudnorm, madmom, scipy)
 - Các hằng số nhạc lý: PITCH_CLASSES, ENHARMONIC, chord templates
 - Profile Krumhansl-Schmuckler để detect key
-- GENRE_MAP mapping metadata sang Suno tags
 """
 
-import os
 import sys
-import json
-import time
 import warnings
-import datetime
 warnings.filterwarnings("ignore")
 
 # ─── IMPORT & DEPENDENCY DETECTION ────────────────────────────────────────────
@@ -85,32 +80,3 @@ SUS4_TEMPLATE    = np.array([1,0,0,0,0,1,0,1,0,0,0,0], dtype=float)  # [0,5,7]
 KS_MAJOR = np.array([6.35,2.23,3.48,2.33,4.38,4.09,2.52,5.19,2.39,3.66,2.29,2.88])
 KS_MINOR = np.array([6.33,2.68,3.52,5.38,2.60,3.53,2.54,4.75,3.98,2.69,3.34,3.17])
 
-# Mapping genre từ metadata sang Suno tags
-GENRE_MAP = {
-    "pop": ["pop", "contemporary"],
-    "rock": ["rock", "electric guitar", "distortion"],
-    "metal": ["metal", "heavy guitar", "double kick drums"],
-    "jazz": ["jazz", "swing", "improvisation", "saxophone"],
-    "classical": ["orchestral", "classical", "strings ensemble"],
-    "electronic": ["electronic", "synthesizer", "EDM"],
-    "hip hop": ["hip-hop", "rap", "808 bass", "trap"],
-    "hip-hop": ["hip-hop", "rap", "808 bass"],
-    "r&b": ["R&B", "soul", "smooth", "groove"],
-    "rnb": ["R&B", "soul", "groove"],
-    "country": ["country", "acoustic guitar", "twang"],
-    "folk": ["folk", "acoustic", "storytelling"],
-    "reggae": ["reggae", "offbeat guitar", "bass-heavy"],
-    "blues": ["blues", "12-bar", "slide guitar"],
-    "soul": ["soul", "gospel", "soulful vocals"],
-    "latin": ["latin", "percussion", "rhythmic"],
-    "k-pop": ["K-pop", "polished production", "catchy hook"],
-    "kpop": ["K-pop", "polished production"],
-    "indie": ["indie", "lo-fi", "bedroom production"],
-    "alternative": ["alternative", "indie", "unconventional"],
-    "punk": ["punk", "fast", "raw energy", "power chords"],
-    "dance": ["dance", "four-on-the-floor", "club"],
-    "house": ["house", "four-on-the-floor", "synth bass"],
-    "techno": ["techno", "industrial", "repetitive beat"],
-    "trap": ["trap", "hi-hats", "808 bass", "dark"],
-    "lo-fi": ["lo-fi", "vinyl crackle", "warm", "chill"],
-}

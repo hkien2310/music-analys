@@ -35,73 +35,22 @@ def build_suno_prompt(meta, rhythm, key_info, chords, structure, dynamics, timbr
     # STEP 1: DETECT SONIC ARCHETYPE
     # The archetype shapes the ENTIRE prompt — vocabulary, adjectives, feel
     # ────────────────────────────────────────────────────────────────────────
-    def _detect_archetype():
-        # Keyword shortcuts from metadata genre
-        kw_map = {
-            "hip hop": "hiphop", "hip-hop": "hiphop", "rap": "hiphop",
-            "r&b": "rnb", "soul": "gospel-soul", "gospel": "gospel-soul",
-            "jazz": "jazz", "blues": "blues",
-            "metal": "metal", "heavy": "metal",
-            "ambient": "ambient", "classical": "ambient",
-            "electronic": "edm", "edm": "edm", "techno": "edm", "house": "edm",
-            "folk": "folk-rock", "country": "folk-rock", "bluegrass": "folk-rock",
-            "rock": "alt-rock", "punk": "alt-rock", "grunge": "alt-rock",
-            "indie": "indie-pop",
-        }
-        for kw, arch in kw_map.items():
-            if kw in genre_raw: return arch
-
-        # Feature-based detection (ordered by specificity)
-        if bpm > 135 and perc_ratio > 0.40:
-            return "edm"
-        if bpm > 120 and perc_ratio > 0.30 and sc_hz > 3500:
-            return "upbeat-pop"
-        if valence > 0.65 and dance > 0.70 and scale == "Major":
-            return "gospel-soul"
-        if scale == "Minor" and valence < 0.35 and bpm < 110:
-            return "dark-alt"
-        if harm_ratio > 0.85 and bpm < 85:
-            return "folk-rock" if sc_hz > 1800 else "ambient"
-        if harm_ratio > 0.75 and bpm < 100:
-            return "folk-rock"
-        if sc_hz < 1100 and harm_ratio > 0.65:
-            return "rnb"
-        if bpm >= 95 and sc_hz > 2500 and valence > 0.50:
-            return "indie-pop"
-        if scale == "Minor" and valence < 0.50:
-            return "alt-rock"
-        return "contemporary-pop"
+    from .archetype import GENRE_STRINGS as _GENRE_STRINGS
 
     if archetype_result:
         archetype = archetype_result["archetype"]
     else:
-        archetype = _detect_archetype()
+        archetype = "contemporary-pop"  # Safe fallback
 
     # ────────────────────────────────────────────────────────────────────────
     # STEP 2: GENRE + INFLUENCES (evocative, specific to archetype)
     # ────────────────────────────────────────────────────────────────────────
-    GENRE_STRINGS = {
-        "gospel-soul":      "Gospel-soul with indie-folk warmth",
-        "folk-rock":        "Indie folk-rock with Americana and roots-rock influences",
-        "alt-rock":         "Brooding alternative rock with post-punk undertones",
-        "dark-alt":         "Dark alternative rock with gothic and shoegaze undertones",
-        "indie-pop":        "Sunlit indie pop with bedroom-pop and dream-pop influences",
-        "contemporary-pop": "Contemporary pop with alternative and soul influences",
-        "upbeat-pop":       "Contemporary pop with funk and gospel energy",
-        "rnb":              "Smooth neo-soul with classic R&B and jazz influences",
-        "edm":              "Electronic dance music with progressive house influences",
-        "hiphop":           "Hip-hop with boom-bap and soul sample influences",
-        "ambient":          "Cinematic ambient with post-rock and orchestral influences",
-        "jazz":             "Jazz-influenced indie with sophisticated harmonic textures",
-        "blues":            "Blues-rock with Southern soul and gospel influences",
-        "metal":            "Heavy metal with progressive and alternative influences",
-    }
 
     # Use archetype_result's genre_string if available, otherwise fallback to GENRE_STRINGS
     if archetype_result and archetype_result.get("genre_string"):
         genre_str = archetype_result["genre_string"]
     else:
-        genre_str = GENRE_STRINGS.get(archetype, "Contemporary pop with alternative influences")
+        genre_str = _GENRE_STRINGS.get(archetype, "Contemporary pop with alternative influences")
 
     # If scale is Minor, skew toward darker vocabulary
     if scale == "Minor" and "soul" in genre_str:

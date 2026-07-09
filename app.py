@@ -304,7 +304,7 @@ def run_analysis(audio_path: str, original_name: str = "") -> dict:
     # Use vocal track for lyrics if available
     lyrics_raw = analyze_lyrics(vocals_path if vocals_path else audio_path)
     
-    cleanup_stems()
+    cleanup_stems("separated")
 
     elapsed = round(time.time() - t0, 1)
 

@@ -1299,8 +1299,38 @@ def build_suno_prompt(meta, rhythm, key_info, chords, structure, dynamics, timbr
             if harm_ratio > 0.85:
                 return "a fingerpicked acoustic guitar weaving delicate melodic counterpoint"
             return "a clean electric guitar with spacious, effects-laden chord voicings"
+        tags_lower = [t.lower() for t in audio_tags]
+        detected_leads = []
+        if "piano" in tags_lower: detected_leads.append("a melodic piano")
+        if "acoustic guitar" in tags_lower: detected_leads.append("an acoustic guitar")
+        if "electric guitar" in tags_lower: detected_leads.append("an electric guitar")
+        if "synthesizer" in tags_lower: detected_leads.append("a lead synthesizer")
+        if "saxophone" in tags_lower: detected_leads.append("a saxophone")
+        if "whistling" in tags_lower or "whistle" in tags_lower: detected_leads.append("a prominent whistling melody")
+        
+        if detected_leads:
+            return " and ".join(detected_leads) + " leading the arrangement"
 
-        return "a prominent acoustic guitar strumming driving eighth-note patterns"
+        if archetype == "folk-rock":
+            return "a strummed acoustic guitar"
+        if archetype == "indie-pop":
+            return "an electric guitar with clean arpeggios"
+        if archetype in ("gospel-soul", "jazz", "rnb") and harm_ratio > 0.8:
+            return "a warm piano"
+        if archetype == "alt-rock":
+            return "a distorted rhythm guitar"
+        if archetype == "dark-alt":
+            return "a dark, heavily chorused bassline"
+        if archetype == "metal":
+            return "a heavily distorted, down-tuned electric guitar playing aggressive riffs"
+        if archetype == "contemporary-pop" and bpm > 110:
+            return "a bright, plucky synthesizer lead"
+        if archetype == "ambient":
+            return "a lush, slowly evolving synthesizer pad"
+        if archetype == "edm":
+            return "a massive, detuned supersaw synthesizer"
+        
+        return "a steady rhythm section"
 
     # ────────────────────────────────────────────────────────────────────────
     # STEP 4: BASS DESCRIPTION (groove character + playing style)
@@ -1428,16 +1458,19 @@ def build_suno_prompt(meta, rhythm, key_info, chords, structure, dynamics, timbr
         lead = LEAD_QUALITIES.get(archetype, "Lead vocals are warm and expressive, delivering the melody with conviction")
 
         # Backing vocals based on archetype
-        if archetype in ("gospel-soul",) or (valence > 0.60 and dance > 0.65):
-            backing = "supported by a large gospel-style choir providing call-and-response and harmonized backing"
+        tags_lower = [t.lower() for t in audio_tags]
+        if "choir" in tags_lower:
+            backing = "supported by a large choir providing harmonized backing"
+        elif archetype in ("gospel-soul",) or (valence > 0.60 and dance > 0.65):
+            backing = "supported by upbeat harmonized backing vocals"
         elif archetype in ("folk-rock", "blues"):
-            backing = "backed by warm three-part harmonies evoking communal, campfire intimacy"
+            backing = "backed by warm three-part harmonies"
         elif archetype in ("indie-pop", "contemporary-pop") and valence > 0.50:
-            backing = "supported by layered vocal harmonies providing lush, stacked depth"
+            backing = "supported by layered vocal harmonies"
         elif archetype in ("alt-rock", "dark-alt"):
-            backing = "with sparse, dissonant backing harmonies adding unease and tension"
+            backing = "with sparse, dissonant backing harmonies"
         elif archetype == "rnb":
-            backing = "with breathy, interlocking backing vocals weaving around the lead"
+            backing = "with breathy, interlocking backing vocals"
         else:
             backing = None
 
@@ -1545,6 +1578,11 @@ def build_suno_prompt(meta, rhythm, key_info, chords, structure, dynamics, timbr
     if accent_d:   clauses.append(accent_d)
     if arr_d:      clauses.append(arr_d)
     clauses.append(technical)
+    
+    # Inject actual Audio Tags explicitly for Suno
+    real_tags = [t for t in audio_tags if t.lower() not in ("music", "speech", "thunk", "inside, small room")]
+    if real_tags:
+        clauses.append("Prominent elements: " + ", ".join(real_tags))
 
     style_prompt = ", ".join(clauses)
 

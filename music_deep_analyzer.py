@@ -1734,8 +1734,15 @@ def main():
     progress("Đọc metadata...")
     meta = get_metadata(file_path)
 
+    # ── Output Directory Setup ──
+    base_name = os.path.splitext(os.path.basename(file_path))[0]
+    out_dir = os.path.join("outputs", base_name)
+    os.makedirs(out_dir, exist_ok=True)
+    
+    stems_dir = os.path.join(out_dir, "stems")
+
     # ── 1.5. Separate Stems (Demucs) ──
-    vocals_path, no_vocals_path = separate_stems(file_path)
+    vocals_path, no_vocals_path = separate_stems(file_path, out_dir=stems_dir)
     if vocals_path and no_vocals_path:
         progress("Tải file No-Vocals cho phân tích Harmonic...")
         y_harmonic, sr_harmonic = librosa.load(no_vocals_path, sr=None, mono=True)
@@ -1788,7 +1795,7 @@ def main():
     lyrics = analyze_lyrics(target_lyric_audio)
     
     # ── 12. Cleanup ──
-    cleanup_stems()
+    cleanup_stems(stems_dir)
 
     elapsed = round(time.time() - start_time, 1)
     progress(f"Hoàn thành phân tích sau {elapsed}s")
@@ -1801,9 +1808,8 @@ def main():
                                      dynamics, timbre, extra, audio_tags, lyrics)
 
     # ── Save outputs ──
-    base_name = os.path.splitext(file_path)[0]
-    report_path = base_name + "_analysis.md"
-    prompt_path = base_name + "_suno_prompt.txt"
+    report_path = os.path.join(out_dir, base_name + "_analysis.md")
+    prompt_path = os.path.join(out_dir, base_name + "_suno_prompt.txt")
 
     with open(report_path, "w", encoding="utf-8") as f:
         f.write(report_md)

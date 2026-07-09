@@ -33,6 +33,7 @@ from analyzer.instruments import analyze_instruments
 from analyzer.lyrics import analyze_lyrics
 from analyzer.report_builder import build_report
 from analyzer.suno_prompt_builder import build_suno_prompt
+from analyzer.archetype import detect_archetype
 
 # ─── Thư viện cần thiết ──────────────────────────────────────────────────────
 
@@ -136,17 +137,23 @@ def main():
     # ── 8. Timbre ──
     timbre = analyze_timbre(y, sr)
 
-    # ── 9. Extra ──
-    extra = analyze_extra(y, sr, duration)
+    # ── 9. Instruments / Tags (trước Extra để có tag_probs) ──
+    audio_tags, tag_probs = analyze_instruments(file_path)
 
-    # ── 10. Instruments / Tags ──
-    audio_tags = analyze_instruments(file_path)
+    # ── 10. Extra (dùng PANNs mood tags cho valence) ──
+    extra = analyze_extra(y, sr, duration, tag_probs=tag_probs)
 
-    # ── 11. Lyrics ──
+    # ── 11. Archetype Detection (weighted scoring) ──
+    archetype_result = detect_archetype(
+        audio_tags, tag_probs, rhythm, key_info, timbre, extra, meta
+    )
+    progress(f"Archetype: {archetype_result['genre_label']} (confidence: {archetype_result['confidence']:.0%})")
+
+    # ── 12. Lyrics ──
     target_lyric_audio = vocals_path if vocals_path else file_path
     lyrics = analyze_lyrics(target_lyric_audio)
 
-    # ── 12. Cleanup ──
+    # ── 13. Cleanup ──
     cleanup_stems(stems_dir)
 
     elapsed = round(time.time() - start_time, 1)
@@ -156,11 +163,13 @@ def main():
     # ── Build outputs ──
     report_md = build_report(
         file_path, meta, audio_props, rhythm, key_info,
-        chords, structure, dynamics, timbre, extra, audio_tags, lyrics
+        chords, structure, dynamics, timbre, extra, audio_tags, lyrics,
+        archetype_result=archetype_result
     )
     suno_prompt = build_suno_prompt(
         meta, rhythm, key_info, chords, structure,
-        dynamics, timbre, extra, audio_tags, lyrics
+        dynamics, timbre, extra, audio_tags, lyrics,
+        archetype_result=archetype_result
     )
 
     # ── Save outputs ──

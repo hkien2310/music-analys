@@ -263,6 +263,7 @@ def run_analysis(audio_path: str, original_name: str = "") -> dict:
     from analyzer.instruments import analyze_instruments
     from analyzer.report_builder import build_report
     from analyzer.suno_prompt_builder import build_suno_prompt
+    from analyzer.archetype import detect_archetype
     import librosa
 
     name = Path(original_name).stem if original_name else Path(audio_path).stem
@@ -288,8 +289,17 @@ def run_analysis(audio_path: str, original_name: str = "") -> dict:
     struct_raw = analyze_structure(y, sr, duration, beat_times)
     dyn_raw    = analyze_dynamics(y, sr, duration)
     timbre_raw = analyze_timbre(y, sr)
-    extra_raw  = analyze_extra(y, sr, duration)
-    audio_tags = analyze_instruments(audio_path)
+    
+    # Instruments (trả về tuple: display_tags + full probs)
+    audio_tags, tag_probs = analyze_instruments(audio_path)
+    
+    # Extra features (dùng PANNs mood cho valence)
+    extra_raw  = analyze_extra(y, sr, duration, tag_probs=tag_probs)
+    
+    # Archetype detection (weighted scoring)
+    archetype_result = detect_archetype(
+        audio_tags, tag_probs, rhythm_raw, key_raw, timbre_raw, extra_raw, meta
+    )
     
     # Use vocal track for lyrics if available
     lyrics_raw = analyze_lyrics(vocals_path if vocals_path else audio_path)
@@ -310,9 +320,11 @@ def run_analysis(audio_path: str, original_name: str = "") -> dict:
     }
     report_md = build_report(audio_path, meta, audio_props,
                              rhythm_raw, key_raw, chords_raw,
-                             struct_raw, dyn_raw, timbre_raw, extra_raw, audio_tags, lyrics_raw)
+                             struct_raw, dyn_raw, timbre_raw, extra_raw, audio_tags, lyrics_raw,
+                             archetype_result=archetype_result)
     suno_txt  = build_suno_prompt(meta, rhythm_raw, key_raw, chords_raw,
-                                  struct_raw, dyn_raw, timbre_raw, extra_raw, audio_tags, lyrics_raw)
+                                  struct_raw, dyn_raw, timbre_raw, extra_raw, audio_tags, lyrics_raw,
+                                  archetype_result=archetype_result)
 
     bpm  = rhythm_raw.get("tempo_bpm", 0)
     feel = _bpm_feel(bpm)

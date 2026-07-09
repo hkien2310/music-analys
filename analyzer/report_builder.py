@@ -62,63 +62,6 @@ TAG_DESCRIPTIONS = {
 }
 
 
-# ─── ARCHETYPE DETECTION (simplified, mirrors suno_prompt_builder) ─────────
-
-def _detect_archetype(bpm, scale, valence, dance, sc_hz, harm_ratio, perc_ratio,
-                      genre_raw):
-    """Detect sonic archetype from analysis features."""
-    kw_map = {
-        "hip hop": "hiphop", "hip-hop": "hiphop", "rap": "hiphop",
-        "r&b": "rnb", "soul": "gospel-soul", "gospel": "gospel-soul",
-        "jazz": "jazz", "blues": "blues",
-        "metal": "metal", "heavy": "metal",
-        "ambient": "ambient", "classical": "ambient",
-        "electronic": "edm", "edm": "edm", "techno": "edm", "house": "edm",
-        "folk": "folk-rock", "country": "folk-rock", "bluegrass": "folk-rock",
-        "rock": "alt-rock", "punk": "alt-rock", "grunge": "alt-rock",
-        "indie": "indie-pop",
-    }
-    for kw, arch in kw_map.items():
-        if kw in genre_raw:
-            return arch
-
-    if bpm > 135 and perc_ratio > 0.40:
-        return "edm"
-    if bpm > 120 and perc_ratio > 0.30 and sc_hz > 3500:
-        return "upbeat-pop"
-    if valence > 0.65 and dance > 0.70 and scale == "Major":
-        return "gospel-soul"
-    if scale == "Minor" and valence < 0.35 and bpm < 110:
-        return "dark-alt"
-    if harm_ratio > 0.85 and bpm < 85:
-        return "folk-rock" if sc_hz > 1800 else "ambient"
-    if harm_ratio > 0.75 and bpm < 100:
-        return "folk-rock"
-    if sc_hz < 1100 and harm_ratio > 0.65:
-        return "rnb"
-    if bpm >= 95 and sc_hz > 2500 and valence > 0.50:
-        return "indie-pop"
-    if scale == "Minor" and valence < 0.50:
-        return "alt-rock"
-    return "contemporary-pop"
-
-
-ARCHETYPE_VN = {
-    "gospel-soul":      "Gospel-soul ấm áp",
-    "folk-rock":        "Folk-rock / Americana",
-    "alt-rock":         "Alternative rock",
-    "dark-alt":         "Dark alternative",
-    "indie-pop":        "Indie pop",
-    "contemporary-pop": "Pop đương đại",
-    "upbeat-pop":       "Pop sôi nổi",
-    "rnb":              "Neo-soul / R&B",
-    "edm":              "Electronic / EDM",
-    "hiphop":           "Hip-hop",
-    "ambient":          "Ambient / cinematic",
-    "jazz":             "Jazz",
-    "blues":            "Blues",
-    "metal":            "Metal",
-}
 
 
 # ─── ROMAN NUMERAL ANALYSIS ──────────────────────────────────────────────────
@@ -257,7 +200,8 @@ def _get_section_at_time(structure, time_sec):
 # ─── MAIN REPORT BUILDER ─────────────────────────────────────────────────────
 
 def build_report(file_path, meta, audio_props, rhythm, key_info, chords,
-                 structure, dynamics, timbre, extra, audio_tags, lyrics=""):
+                 structure, dynamics, timbre, extra, audio_tags, lyrics="",
+                 archetype_result=None):
     """
     Tạo báo cáo Markdown tổng hợp tất cả kết quả phân tích.
     """
@@ -283,9 +227,16 @@ def build_report(file_path, meta, audio_props, rhythm, key_info, chords,
     perc_ratio = timbre["percussive_ratio"]
     genre_raw = (meta.get("genre") or "").lower().strip()
 
-    archetype = _detect_archetype(bpm, scale, valence, dance, sc_hz,
-                                  harm_ratio, perc_ratio, genre_raw)
-    archetype_vn = ARCHETYPE_VN.get(archetype, archetype)
+    if archetype_result:
+        archetype = archetype_result["archetype"]
+        archetype_vn = archetype_result["genre_label_vn"]
+        archetype_confidence = archetype_result["confidence"]
+        archetype_top3 = archetype_result.get("top3", [])
+    else:
+        archetype = "contemporary-pop"
+        archetype_vn = "Pop đương đại"
+        archetype_confidence = 0.5
+        archetype_top3 = []
 
     # BPM description
     if bpm < 60:
@@ -342,7 +293,7 @@ def build_report(file_path, meta, audio_props, rhythm, key_info, chords,
 
     A("## 🔍 Nhận xét tổng quan")
     A("")
-    A(f"> Bài nhạc mang phong cách **{archetype_vn}** với tempo {bpm} BPM — {bpm_desc}.")
+    A(f"> Bài nhạc mang phong cách **{archetype_vn}** (confidence: {archetype_confidence:.0%}) với tempo {bpm} BPM — {bpm_desc}.")
     A(f"> Âm sắc: {brightness_str}, {hp_short}.")
     A(f"> Tông nhạc **{key_info['full']}** (confidence {key_info['confidence_pct']}%).")
     A(f"> Bài có cấu trúc **{n_sections} đoạn** rõ ràng.")
@@ -367,7 +318,17 @@ def build_report(file_path, meta, audio_props, rhythm, key_info, chords,
     A(f"| 🎸 Phong cách | {timbre['hp_description']} |")
     A(f"| 🌈 Âm sắc | {timbre['brightness']} |")
     A(f"| 🎧 Âm thanh (PANNs)| **{', '.join(audio_tags)}** |")
-    A(f"| 🏷️ Archetype | **{archetype_vn}** ({archetype}) |")
+    A(f"| 🏷️ Archetype | **{archetype_vn}** ({archetype_confidence:.0%}) |")
+    A("")
+
+    if archetype_top3:
+        A("")
+        A("**Top 3 phong cách phù hợp nhất:**")
+        A("")
+        A("| Hạng | Phong cách | Điểm |")
+        A("|------|-----------|------|")
+        for i, (arch, score) in enumerate(archetype_top3, 1):
+            A(f"| {i} | {arch} | {score:.2f} |")
     A("")
 
     # ── METADATA ──
@@ -623,7 +584,8 @@ def build_report(file_path, meta, audio_props, rhythm, key_info, chords,
     A("")
     A("### Cảm xúc & Chuyển động:")
     A(f"- **Danceability:** {extra['danceability_score']} / 1.0 — {extra['danceability_label']}")
-    A(f"- **Valence (tâm trạng):** {extra['valence_score']} / 1.0 — {extra['valence_label']}")
+    valence_method = extra.get("valence_method", "heuristic")
+    A(f"- **Valence (tâm trạng):** {extra['valence_score']} / 1.0 — {extra['valence_label']} _(method: {valence_method})_")
     A("")
 
     # ── NEW: AUDIO TAGS INTERPRETATION TABLE ──

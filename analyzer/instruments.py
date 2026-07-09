@@ -2,7 +2,7 @@
 instruments.py — Nhận diện nhạc cụ, giọng hát và không gian bằng PANNs (AudioSet).
 
 Sử dụng PANNs (Audio Tagging) với model Cnn14 để phân loại
-âm thanh và trả về các tag phù hợp nhất.
+âm thanh và trả về các tag phù hợp nhất + toàn bộ probability dict.
 """
 
 from .utils import progress
@@ -10,7 +10,14 @@ from .utils import progress
 # ─── MODULE 1G: INSTRUMENTS & AUDIO TAGS (PANNs) ──────────────────────────────
 
 def analyze_instruments(audio_path):
-    """Sử dụng PANNs (AudioSet) để nhận diện nhạc cụ, giọng hát và không gian."""
+    """
+    Sử dụng PANNs (AudioSet) để nhận diện nhạc cụ, giọng hát và không gian.
+    
+    Returns:
+        tuple: (display_tags, tag_probs)
+            - display_tags: list[str]       — top 6 tags cho hiển thị
+            - tag_probs:    dict[str, float] — TẤT CẢ tags với probability (>= 0.005)
+    """
     progress("Phân tích nhạc cụ & âm thanh bằng PANNs (Audio Tagging)...")
     try:
         from panns_inference import AudioTagging, labels
@@ -28,26 +35,37 @@ def analyze_instruments(audio_path):
             at = AudioTagging(checkpoint_path=None, device='cpu')
             clipwise_output, _ = at.inference(audio)
 
+        all_labels = np.array(labels)
         sorted_indexes = np.argsort(clipwise_output[0])[::-1]
         
-        tags = []
-        # Các nhãn quá chung chung, không hữu ích cho Suno prompt
+        # ── Display tags: top tags cho UI/report ──
+        display_tags = []
         ignore_tags = {
             "Music", "Musical instrument", "Sound", "Song", "Noise",
             "Inside, small room", "Inside, large room or hall", "Speech",
             "Music of Africa", "Music of Asia", "Music of Latin America"
         }
 
-        for i in range(20):
+        for i in range(30):  # Scan nhiều hơn để có đủ tags tốt
             idx = sorted_indexes[i]
-            label = np.array(labels)[idx]
+            label = all_labels[idx]
             prob = float(clipwise_output[0][idx])
             if label not in ignore_tags and prob >= 0.01:
-                tags.append(label)
+                display_tags.append(label)
+        
+        display_tags = display_tags[:6]  # Chỉ hiển thị top 6
 
-        return tags[:6]  # Trả về tối đa 6 nhãn phù hợp nhất
+        # ── Full probability dict: cho archetype detection ──
+        tag_probs = {}
+        for i in range(len(all_labels)):
+            prob = float(clipwise_output[0][i])
+            if prob >= 0.005:  # Threshold rất thấp — giữ lại tín hiệu yếu
+                tag_probs[all_labels[i]] = round(prob, 4)
+
+        return display_tags, tag_probs
+        
     except ImportError:
-        return ["(panns-inference chưa được cài đặt)"]
+        return ["(panns-inference chưa được cài đặt)"], {}
     except Exception as e:
         progress(f"Lỗi khi chạy PANNs: {e}")
-        return []
+        return [], {}

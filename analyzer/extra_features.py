@@ -12,8 +12,13 @@ from .utils import progress
 
 # ─── MODULE 1I: EXTRA FEATURES ────────────────────────────────────────────────
 
-def analyze_extra(y, sr, duration):
-    """Các đặc trưng bổ sung: danceability estimate, valence estimate"""
+def analyze_extra(y, sr, duration, tag_probs=None):
+    """Các đặc trưng bổ sung: danceability estimate, valence estimate
+    
+    Args:
+        tag_probs: dict[str, float] — PANNs tag probabilities (optional).
+                   Nếu có, PANNs mood tags sẽ được dùng để cải thiện valence.
+    """
     progress("Phân tích đặc trưng bổ sung...")
     result = {}
 
@@ -53,8 +58,8 @@ def analyze_extra(y, sr, duration):
     else:
         result["danceability_label"] = "Thấp — không phù hợp để dance"
 
-    # Valence estimate từ spectral brightness + scale
-    # (heuristic: bài sáng & nhanh thường "vui hơn")
+    # ── Valence estimate ──
+    # Step 1: Heuristic baseline từ spectral brightness + tempo
     spec_cent = float(np.mean(librosa.feature.spectral_centroid(y=y, sr=sr)))
     brightness_norm = min(1.0, spec_cent / 4000.0)
 
@@ -62,8 +67,43 @@ def analyze_extra(y, sr, duration):
     tempo_val = float(tempo[0]) if hasattr(tempo, '__len__') else float(tempo)
     tempo_norm = min(1.0, max(0.0, (tempo_val - 60) / 120.0))
 
-    valence = round(brightness_norm * 0.5 + tempo_norm * 0.5, 2)
+    valence_heuristic = brightness_norm * 0.5 + tempo_norm * 0.5
+
+    # Step 2: Override với PANNs mood tags (nếu có)
+    valence = valence_heuristic
+    panns_mood_used = False
+    
+    if tag_probs:
+        happy_p  = tag_probs.get("Happy music", 0)
+        sad_p    = tag_probs.get("Sad music", 0)
+        tender_p = tag_probs.get("Tender music", 0)
+        exciting_p = tag_probs.get("Exciting music", 0)
+        angry_p  = tag_probs.get("Angry music", 0)
+        scary_p  = tag_probs.get("Scary music", 0)
+        
+        # Nếu bất kỳ mood tag nào đủ mạnh, dùng để điều chỉnh
+        max_mood = max(happy_p, sad_p, tender_p, exciting_p, angry_p, scary_p)
+        if max_mood > 0.03:
+            # PANNs mood score: dương = vui, âm = buồn
+            panns_valence = (
+                happy_p * 1.0
+                + exciting_p * 0.7
+                - sad_p * 0.9
+                - tender_p * 0.3
+                - angry_p * 0.5
+                - scary_p * 0.6
+            )
+            # Map to 0-1 range (centered at 0.5)
+            panns_valence_norm = max(0.0, min(1.0, 0.5 + panns_valence * 2.0))
+            
+            # Blend: 60% PANNs, 40% heuristic (PANNs is more reliable)
+            valence = 0.6 * panns_valence_norm + 0.4 * valence_heuristic
+            panns_mood_used = True
+
+    valence = round(max(0.0, min(1.0, valence)), 2)
     result["valence_score"] = valence
+    result["valence_method"] = "PANNs + heuristic" if panns_mood_used else "heuristic"
+    
     if valence >= 0.7:
         result["valence_label"] = "Tươi sáng / Vui tươi"
     elif valence >= 0.5:
@@ -74,3 +114,4 @@ def analyze_extra(y, sr, duration):
         result["valence_label"] = "Tối / Buồn / Melancholic"
 
     return result
+

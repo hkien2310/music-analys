@@ -12,7 +12,7 @@ from .config import PITCH_CLASSES
 from .utils import fmt_time, progress
 
 
-def build_suno_prompt(meta, rhythm, key_info, chords, structure, dynamics, timbre, extra, audio_tags, lyrics=""):
+def build_suno_prompt(meta, rhythm, key_info, chords, structure, dynamics, timbre, extra, audio_tags, lyrics="", archetype_result=None):
     """
     Tạo ra một file văn bản chứa prompt copy-paste trực tiếp cho Suno AI.
     """
@@ -72,7 +72,10 @@ def build_suno_prompt(meta, rhythm, key_info, chords, structure, dynamics, timbr
             return "alt-rock"
         return "contemporary-pop"
 
-    archetype = _detect_archetype()
+    if archetype_result:
+        archetype = archetype_result["archetype"]
+    else:
+        archetype = _detect_archetype()
 
     # ────────────────────────────────────────────────────────────────────────
     # STEP 2: GENRE + INFLUENCES (evocative, specific to archetype)
@@ -94,8 +97,13 @@ def build_suno_prompt(meta, rhythm, key_info, chords, structure, dynamics, timbr
         "metal":            "Heavy metal with progressive and alternative influences",
     }
 
+    # Use archetype_result's genre_string if available, otherwise fallback to GENRE_STRINGS
+    if archetype_result and archetype_result.get("genre_string"):
+        genre_str = archetype_result["genre_string"]
+    else:
+        genre_str = GENRE_STRINGS.get(archetype, "Contemporary pop with alternative influences")
+
     # If scale is Minor, skew toward darker vocabulary
-    genre_str = GENRE_STRINGS.get(archetype, "Contemporary pop with alternative influences")
     if scale == "Minor" and "soul" in genre_str:
         genre_str = genre_str.replace("warmth", "melancholy")
     if scale == "Minor" and archetype == "indie-pop":
@@ -498,7 +506,8 @@ def build_suno_prompt(meta, rhythm, key_info, chords, structure, dynamics, timbr
     A(SEP)
     A("")
     A("Tong nhac:     {} (confidence: {}%)".format(key_full, key_info["confidence_pct"]))
-    A("Tempo:         {} BPM / {}  [Archetype: {}]".format(bpm, ts, archetype))
+    conf_str = f" ({archetype_result['confidence']:.0%})" if archetype_result else ""
+    A("Tempo:         {} BPM / {}  [Archetype: {}{}]".format(bpm, ts, archetype, conf_str))
     A("Vong hop am:  {}".format(chord_hint))
     A("Loudness:      {} LUFS".format(dynamics.get("loudness_lufs", "N/A")))
     A("Danceability:  {} — {}".format(extra["danceability_score"], extra["danceability_label"]))

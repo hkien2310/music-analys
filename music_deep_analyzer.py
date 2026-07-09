@@ -1262,43 +1262,6 @@ def build_suno_prompt(meta, rhythm, key_info, chords, structure, dynamics, timbr
     # STEP 3: LEAD RHYTHM INSTRUMENT (specific technique + sonic character)
     # ────────────────────────────────────────────────────────────────────────
     def _lead_instrument():
-        # Guitar articulation based on context
-        if archetype in ("folk-rock", "gospel-soul", "blues"):
-            if bpm < 90:
-                return "a prominent acoustic guitar fingerpicking intricate melodic arpeggios"
-            if harm_ratio > 0.80:
-                return "a prominent acoustic guitar strumming driving eighth-note patterns"
-            return "an acoustic guitar strumming syncopated chord patterns with percussive pull-offs"
-
-        if archetype in ("alt-rock", "dark-alt", "metal"):
-            if valence < 0.30:
-                return "a distorted electric guitar playing angular, stabbing power chord riffs"
-            if bpm > 110:
-                return "a wiry electric guitar delivering tight, palm-muted riff patterns"
-            return "a brooding electric guitar with heavy chord voicings and subtle feedback"
-
-        if archetype == "indie-pop":
-            if sc_hz > 3200:
-                return "a chiming electric guitar with clean, reverb-washed arpeggios"
-            return "a jangly electric guitar with bright, open chord strumming"
-
-        if archetype in ("contemporary-pop", "upbeat-pop"):
-            if harm_ratio > 0.75 and bpm < 115:
-                return "an acoustic guitar strumming crisp driving eighth-note patterns"
-            if bpm > 115:
-                return "a bright electric guitar with crisp, strummed eighth notes"
-            return "a clean electric guitar playing rhythmic syncopated chord stabs"
-
-        if archetype == "rnb":
-            return "a smooth electric guitar with clean, chord-melody fills and subtle embellishments"
-
-        if archetype == "edm":
-            return "driving synthesizer arpeggios and pulsing sawtooth stabs locked to the grid"
-
-        if archetype in ("ambient", "jazz"):
-            if harm_ratio > 0.85:
-                return "a fingerpicked acoustic guitar weaving delicate melodic counterpoint"
-            return "a clean electric guitar with spacious, effects-laden chord voicings"
         tags_lower = [t.lower() for t in audio_tags]
         detected_leads = []
         if "piano" in tags_lower: detected_leads.append("a melodic piano")

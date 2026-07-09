@@ -253,24 +253,41 @@ def run_analysis(audio_path: str, original_name: str = "") -> dict:
     from music_deep_analyzer import (
         get_metadata, load_audio, analyze_rhythm, analyze_key,
         analyze_chords, analyze_structure, analyze_dynamics,
-        analyze_timbre, analyze_extra, analyze_lyrics, analyze_instruments, build_report, build_suno_prompt
+        analyze_timbre, analyze_extra, analyze_lyrics, analyze_instruments, 
+        build_report, build_suno_prompt, separate_stems, cleanup_stems
     )
+    import librosa
 
     name = Path(original_name).stem if original_name else Path(audio_path).stem
     t0 = time.time()
 
     meta = get_metadata(audio_path)
+    
+    # Run Demucs first
+    vocals_path, no_vocals_path = separate_stems(audio_path)
+    if vocals_path and no_vocals_path:
+        y_harmonic, sr_harmonic = librosa.load(no_vocals_path, sr=None, mono=True)
+    else:
+        y_harmonic, sr_harmonic = None, None
+        
     y, sr, duration, channels = load_audio(audio_path)
     rhythm_raw = analyze_rhythm(y, sr)
     beat_times = rhythm_raw.get("beat_times", [])
-    key_raw    = analyze_key(y, sr)
-    chords_raw = analyze_chords(y, sr, beat_times, key_raw)
+    
+    # Use harmonic track if available
+    key_raw    = analyze_key(y_harmonic if y_harmonic is not None else y, sr_harmonic if sr_harmonic else sr)
+    chords_raw = analyze_chords(y_harmonic if y_harmonic is not None else y, sr_harmonic if sr_harmonic else sr, beat_times, key_raw)
+    
     struct_raw = analyze_structure(y, sr, duration, beat_times)
     dyn_raw    = analyze_dynamics(y, sr, duration)
     timbre_raw = analyze_timbre(y, sr)
     extra_raw  = analyze_extra(y, sr, duration)
-    lyrics_raw = analyze_lyrics(audio_path)
     audio_tags = analyze_instruments(audio_path)
+    
+    # Use vocal track for lyrics if available
+    lyrics_raw = analyze_lyrics(vocals_path if vocals_path else audio_path)
+    
+    cleanup_stems()
 
     elapsed = round(time.time() - t0, 1)
 

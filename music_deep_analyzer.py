@@ -189,6 +189,44 @@ def load_audio(file_path):
         channels = 1
     return y, sr, duration, channels
 
+# ─── MODULE 1B2: SOURCE SEPARATION (DEMUCS) ───────────────────────────────────
+
+def separate_stems(audio_path, out_dir="separated"):
+    """Tách âm thanh thành stems bằng Demucs (2 stems: vocals và no_vocals)"""
+    progress("Đang tách âm thanh bằng Demucs (có thể mất vài phút)...")
+    
+    import subprocess
+    import os
+    import shutil
+    
+    os.makedirs(out_dir, exist_ok=True)
+    try:
+        subprocess.run([
+            "demucs", "-n", "htdemucs", "--two-stems", "vocals", 
+            audio_path, "-o", out_dir
+        ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        
+        base_name = os.path.splitext(os.path.basename(audio_path))[0]
+        # Demucs output structure: out_dir/htdemucs/<base_name>/vocals.wav
+        vocals_path = os.path.join(out_dir, "htdemucs", base_name, "vocals.wav")
+        no_vocals_path = os.path.join(out_dir, "htdemucs", base_name, "no_vocals.wav")
+        
+        if os.path.exists(vocals_path) and os.path.exists(no_vocals_path):
+            return vocals_path, no_vocals_path
+        else:
+            progress("Không tìm thấy file tách sau khi chạy Demucs.")
+            return None, None
+    except Exception as e:
+        progress(f"Lỗi khi chạy Demucs: {e}")
+        return None, None
+
+def cleanup_stems(out_dir="separated"):
+    import shutil
+    try:
+        shutil.rmtree(out_dir, ignore_errors=True)
+    except:
+        pass
+
 # ─── MODULE 1C: RHYTHM ────────────────────────────────────────────────────────
 
 def analyze_rhythm(y, sr):
@@ -1678,6 +1716,14 @@ def main():
     progress("Đọc metadata...")
     meta = get_metadata(file_path)
 
+    # ── 1.5. Separate Stems (Demucs) ──
+    vocals_path, no_vocals_path = separate_stems(file_path)
+    if vocals_path and no_vocals_path:
+        progress("Tải file No-Vocals cho phân tích Harmonic...")
+        y_harmonic, sr_harmonic = librosa.load(no_vocals_path, sr=None, mono=True)
+    else:
+        y_harmonic, sr_harmonic = None, None
+
     # ── 2. Load Audio ──
     y, sr, duration, channels = load_audio(file_path)
 
@@ -1692,13 +1738,16 @@ def main():
     }
 
     # ── 3. Rhythm ──
+    # Nhịp điệu tính trên file gốc (có trống và bass rõ nhất)
     rhythm = analyze_rhythm(y, sr)
 
     # ── 4. Key ──
-    key_info = analyze_key(y, sr)
+    # Tông nhạc tính trên file no_vocals (nếu có) để chuẩn hơn
+    key_info = analyze_key(y_harmonic if y_harmonic is not None else y, sr_harmonic if sr_harmonic else sr)
 
     # ── 5. Chords ──
-    chords = analyze_chords(y, sr, rhythm["beat_times"], key_info)
+    # Hợp âm tính trên file no_vocals (nếu có) để chuẩn hơn
+    chords = analyze_chords(y_harmonic if y_harmonic is not None else y, sr_harmonic if sr_harmonic else sr, rhythm["beat_times"], key_info)
 
     # ── 6. Structure ──
     structure = analyze_structure(y, sr, duration, rhythm["beat_times"])
@@ -1714,6 +1763,14 @@ def main():
 
     # ── 10. Instruments / Tags ──
     audio_tags = analyze_instruments(file_path)
+
+    # ── 11. Lyrics ──
+    # Lấy vocals_path nếu có để Whisper bóc băng tốt hơn
+    target_lyric_audio = vocals_path if vocals_path else file_path
+    lyrics = analyze_lyrics(target_lyric_audio)
+    
+    # ── 12. Cleanup ──
+    cleanup_stems()
 
     elapsed = round(time.time() - start_time, 1)
     progress(f"Hoàn thành phân tích sau {elapsed}s")

@@ -250,12 +250,19 @@ Now write for the analyzed song above. Match the detected BPM ({bpm}), key ({key
 
 # ── Analysis pipeline ────────────────────────────────────────────────────────
 def run_analysis(audio_path: str, original_name: str = "") -> dict:
-    from music_deep_analyzer import (
-        get_metadata, load_audio, analyze_rhythm, analyze_key,
-        analyze_chords, analyze_structure, analyze_dynamics,
-        analyze_timbre, analyze_extra, analyze_lyrics, analyze_instruments, 
-        build_report, build_suno_prompt, separate_stems, cleanup_stems
-    )
+    from analyzer.metadata import get_metadata
+    from analyzer.audio_loader import load_audio, separate_stems, cleanup_stems
+    from analyzer.rhythm import analyze_rhythm
+    from analyzer.key_detection import analyze_key
+    from analyzer.chord_analysis import analyze_chords
+    from analyzer.structure import analyze_structure
+    from analyzer.dynamics import analyze_dynamics
+    from analyzer.timbre import analyze_timbre
+    from analyzer.extra_features import analyze_extra
+    from analyzer.lyrics import analyze_lyrics
+    from analyzer.instruments import analyze_instruments
+    from analyzer.report_builder import build_report
+    from analyzer.suno_prompt_builder import build_suno_prompt
     import librosa
 
     name = Path(original_name).stem if original_name else Path(audio_path).stem

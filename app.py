@@ -303,9 +303,9 @@ def run_analysis(audio_path: str, original_name: str = "") -> dict:
     }
     report_md = build_report(audio_path, meta, audio_props,
                              rhythm_raw, key_raw, chords_raw,
-                             struct_raw, dyn_raw, timbre_raw, extra_raw, audio_tags)
+                             struct_raw, dyn_raw, timbre_raw, extra_raw, audio_tags, lyrics_raw)
     suno_txt  = build_suno_prompt(meta, rhythm_raw, key_raw, chords_raw,
-                                  struct_raw, dyn_raw, timbre_raw, extra_raw, audio_tags)
+                                  struct_raw, dyn_raw, timbre_raw, extra_raw, audio_tags, lyrics_raw)
 
     bpm  = rhythm_raw.get("tempo_bpm", 0)
     feel = _bpm_feel(bpm)

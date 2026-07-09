@@ -889,8 +889,10 @@ def analyze_instruments(audio_path):
 # ─── MODULE 2: GENERATE ANALYSIS REPORT ──────────────────────────────────────
 
 def build_report(file_path, meta, audio_props, rhythm, key_info, chords,
-                 structure, dynamics, timbre, extra, audio_tags):
-    """Tạo báo cáo Markdown chi tiết"""
+                 structure, dynamics, timbre, extra, audio_tags, lyrics=""):
+    """
+    Tạo báo cáo Markdown tổng hợp tất cả kết quả phân tích.
+    """
     progress("Đang tạo báo cáo phân tích Markdown...")
 
     lines = []
@@ -1141,6 +1143,17 @@ def build_report(file_path, meta, audio_props, rhythm, key_info, chords,
     A("")
 
     # ── FOOTER ──
+    # Lời bài hát
+    A("---")
+    A("## 🎤 10. Lời bài hát (Whisper)")
+    A("")
+    if lyrics and lyrics.strip():
+        A("```text")
+        A(lyrics.strip())
+        A("```")
+    else:
+        A("*Không tìm thấy lời bài hát hoặc file không có vocal.*")
+    A("")
     A("---")
     A("## 📌 Ghi chú về độ chính xác")
     A("")
@@ -1156,8 +1169,10 @@ def build_report(file_path, meta, audio_props, rhythm, key_info, chords,
 
 # ─── MODULE 3: GENERATE SUNO PROMPT ──────────────────────────────────────────
 
-def build_suno_prompt(meta, rhythm, key_info, chords, structure, dynamics, timbre, extra, audio_tags):
-    """Tao Suno AI Prompt: archetype-driven narrative voi vocabulary giau co"""
+def build_suno_prompt(meta, rhythm, key_info, chords, structure, dynamics, timbre, extra, audio_tags, lyrics=""):
+    """
+    Tạo ra một file văn bản chứa prompt copy-paste trực tiếp cho Suno AI.
+    """
     progress("Dang tao Suno AI Prompt...")
 
     bpm        = rhythm["tempo_bpm"]
@@ -1629,7 +1644,10 @@ def build_suno_prompt(meta, rhythm, key_info, chords, structure, dynamics, timbr
     A("BUOC 2 — Dan vao o [Lyrics] tren Suno")
     A(SEP)
     A("")
-    A(structure_prompt)
+    if lyrics and lyrics.strip():
+        A(lyrics.strip())
+    else:
+        A(structure_prompt)
     A("")
     A(SEP)
     A("THONG TIN PHAN TICH (tham khao khi tinh chinh)")
@@ -1778,9 +1796,9 @@ def main():
 
     # ── Build outputs ──
     report_md    = build_report(file_path, meta, audio_props, rhythm, key_info,
-                                chords, structure, dynamics, timbre, extra, audio_tags)
+                                chords, structure, dynamics, timbre, extra, audio_tags, lyrics)
     suno_prompt  = build_suno_prompt(meta, rhythm, key_info, chords, structure,
-                                     dynamics, timbre, extra, audio_tags)
+                                     dynamics, timbre, extra, audio_tags, lyrics)
 
     # ── Save outputs ──
     base_name = os.path.splitext(file_path)[0]

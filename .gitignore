@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+music_env/
+.env
+
+# MacOS
+.DS_Store
+
+# Project specific
+music/
+outputs/
+*.mp3
+*.wav
